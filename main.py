@@ -1,5 +1,4 @@
-from fastapi import FastAPI, HTTPException, status
-from fastapi.param_functions import Depends
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from jose import jwt, JWTError
@@ -18,16 +17,26 @@ user_db = {
         "full_name": "ASDF",
         "hashed_password": "$2b$12$EEcTaLvmkd86YT/hbkaXf.r9Wd5vsgI7E8H3emOiPoWw/J5DwA992",
         "disabled": False
+    },
+
+    "user2" : {
+        "username": "admin",
+        "full_name": "Jeffrey Bezos",
+        "hashed_password": "$2b$12$xzLsXOPRkLXtpAcfQaPHdOyf1sIX4AV29anwXvjsLAbqDBdue3Hau",
+        "disabled": False
     }
+
 }
 
 with open("db.json", "r") as read_file:
     data = json.load(read_file)
 
-app = FastAPI()
-menu = data["menu"]
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+app = FastAPI()
+menu = data["menu"]
+
 
 
 class Item(BaseModel):
@@ -54,8 +63,8 @@ class TokenData(BaseModel):
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def verify_password(password, hashed_password):
-    return pwd_context.verify(password, hashed_password)
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_user(db, username: str):
     if username in db:
@@ -141,7 +150,7 @@ async def add_menu(name: str, current_user : User = Depends(get_current_active_u
     new_item = {'id':id, 'name':name}
     menu.append(dict(new_item))
     read_file.close()
-    with open("menu.json", "w") as write_file:
+    with open("db.json", "w") as write_file:
         json.dump(data, write_file, indent=4)
     write_file.close()
     return new_item
@@ -161,7 +170,7 @@ async def update_menu(id: int, name: str, current_user : User = Depends(get_curr
         if menu_item['id'] == id:
             menu_item['name'] = name
             read_file.close()
-            with open("menu.json", "w") as write_file:
+            with open("db.json", "w") as write_file:
                 json.dump(data, write_file, indent=4)
             write_file.close()
             return {"message": "Item Updated Successfully"}
@@ -175,7 +184,7 @@ async def delete_menu(id: int, current_user : User = Depends(get_current_active_
         if menu_item['id'] == id:
             menu.remove(menu_item)
             read_file.close()
-            with open("menu.json", "w") as write_file:
+            with open("db.json", "w") as write_file:
                 json.dump(data, write_file, indent=4)
             write_file.close()
             return {"message": "Item Deleted Successfully"}
