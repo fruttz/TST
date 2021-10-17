@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.param_functions import Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ user_db = {
     "user1" : {
         "username": "asdf",
         "full_name": "ASDF",
-        "hashed_password": "",
+        "hashed_password": "$2b$12$EEcTaLvmkd86YT/hbkaXf.r9Wd5vsgI7E8H3emOiPoWw/J5DwA992",
         "disabled": False
     }
 }
@@ -67,14 +67,15 @@ def authenticate_user(fake_db, username: str, password: str):
     if not user:
         return False
     if not verify_password(password, user.hashed_password):
-        return user
+        return False
+    return user
 
 def create_access_token(data: dict, expires: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires:
         expire = datetime.utcnow() + expires
     else:
-        expire = datetimr.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
