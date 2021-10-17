@@ -1,29 +1,137 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.encoders import jsonable_encoder
+from fastapi import FastAPI, HTTPException, Status
+from fastapi.param_functions import Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+from typing import Optional
+from datetime import datetime, timedelta
 import json
 
-with open("menu.json", "r") as read_file:
+SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+user_db = {
+    "user1" : {
+        "username": "asdf",
+        "full_name": "ASDF",
+        "hashed_password": "",
+        "disabled": False
+    }
+}
+
+with open("db.json", "r") as read_file:
     data = json.load(read_file)
 
 app = FastAPI()
 menu = data["menu"]
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 class Item(BaseModel):
     id: int
     nama: str
 
+class User(BaseModel):
+    username: str
+    full_name: Optional[str] = None
+    disabled: Optional[bool] = None
+
+class UserDB(User):
+    hashed_password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+### AUTH ###
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+def verify_password(password, hashed_password):
+    return pwd_context.verify(password, hashed_password)
+
+def get_user(db, username: str):
+    if username in db:
+        user_dict = db[username]
+        return UserDB(**user_dict)
+
+def authenticate_user(fake_db, username: str, password: str):
+    user = get_user(fake_db, username)
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return user
+
+def create_access_token(data: dict, expires: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires:
+        expire = datetime.utcnow() + expires
+    else:
+        expire = datetimr.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = TokenData(username=username)
+    except JWTError:
+        raise credentials_exception
+    user = get_user(user_db, username=token_data.username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+### CRUD ###
+
 @app.get("/")
 async def root():
     return {"Home":"Home Page"}
 
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(user_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data = {"sub": user.username}, expires = access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/users/me/", response_model = User)
+async def read_users_me(current_user : User = Depends(get_current_active_user)):
+    return current_user
+
 @app.get("/menu")
-async def read_menu():
+async def read_menu(current_user : User = Depends(get_current_active_user)):
     return menu
 
 @app.post("/add-menu")
-async def add_menu(name: str):
+async def add_menu(name: str, current_user : User = Depends(get_current_active_user)):
     id = 1
     if (len(menu) > 0):
         id = menu[len(menu)-1]['id']+1
@@ -36,7 +144,7 @@ async def add_menu(name: str):
     return new_item
 
 @app.get("/get-menu/{id}")
-async def get_menu(id: int):
+async def get_menu(id: int, current_user : User = Depends(get_current_active_user)):
     for menu_item in menu:
         if menu_item['id'] == id:
             return menu_item
@@ -45,7 +153,7 @@ async def get_menu(id: int):
     )
 
 @app.put("/update-menu/{id}")
-async def update_menu(id: int, name: str):
+async def update_menu(id: int, name: str, current_user : User = Depends(get_current_active_user)):
     for menu_item in menu:
         if menu_item['id'] == id:
             menu_item['name'] = name
@@ -59,7 +167,7 @@ async def update_menu(id: int, name: str):
     )
 
 @app.delete("/del-menu/{id}")
-async def delete_menu(id: int):
+async def delete_menu(id: int, current_user : User = Depends(get_current_active_user)):
     for menu_item in menu:
         if menu_item['id'] == id:
             menu.remove(menu_item)
