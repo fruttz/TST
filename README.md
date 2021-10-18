@@ -5,4 +5,4 @@ password: asdf
 
 user2 -->
 username: admin;
-password: admin
+password: secret
