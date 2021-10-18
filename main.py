@@ -12,14 +12,14 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 user_db = {
-    "user1" : {
+    "asdf" : {
         "username": "asdf",
         "full_name": "ASDF",
         "hashed_password": "$2b$12$EEcTaLvmkd86YT/hbkaXf.r9Wd5vsgI7E8H3emOiPoWw/J5DwA992",
         "disabled": False
     },
 
-    "user2" : {
+    "admin" : {
         "username": "admin",
         "full_name": "Jeffrey Bezos",
         "hashed_password": "$2b$12$xzLsXOPRkLXtpAcfQaPHdOyf1sIX4AV29anwXvjsLAbqDBdue3Hau",
