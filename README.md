@@ -1,8 +1,8 @@
 # UNTUK TESTING
 user1 -->
-username: asdf
+username: asdf;
 password: asdf
 
 user2 -->
-username: admin
+username: admin;
 password: admin
